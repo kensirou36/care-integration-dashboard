@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#6366f1">
+  <meta name="description" content="介護業務統合ダッシュボード - かんたん介護、ノウビー、ハローボックス、スプレッドシート、LINE、手書きメモを一元管理">
+
+  <!-- PWA設定 -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="介護ダッシュボード">
+
+  <title>介護統合ダッシュボード</title>
+</head>
+
+<body>
+  <div id="app">
+    <!-- ヘッダー -->
+    <header class="app-header">
+      <div class="header-content">
+        <h1 class="app-title">📊 介護ダッシュボード</h1>
+        <button id="settingsBtn" class="icon-btn" aria-label="設定">⚙️</button>
+      </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="main-content">
+      <!-- ローディング表示 -->
+      <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+        <p>データを読み込み中...</p>
+      </div>
+
+      <!-- 設定画面 -->
+      <div id="settingsView" class="view hidden">
+        <div class="settings-container">
+          <h2>⚙️ 設定</h2>
+
+          <div class="settings-section">
+            <h3>Google Sheets API設定</h3>
+            <div class="form-group">
+              <label for="apiKey">APIキー</label>
+              <input type="text" id="apiKey" placeholder="AIzaSy..." class="input-field">
+              <small>Google Cloud ConsoleでAPIキーを取得してください</small>
+            </div>
+
+            <div class="form-group">
+              <label for="spreadsheetId">スプレッドシートID</label>
+              <input type="text" id="spreadsheetId" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+                class="input-field">
+              <small>スプレッドシートのURLから取得</small>
+            </div>
+
+            <div class="form-group">
+              <label for="autoRefreshInterval">自動更新間隔</label>
+              <select id="autoRefreshInterval" class="input-field">
+                <option value="0">手動のみ</option>
+                <option value="60000">1分</option>
+                <option value="300000" selected>5分</option>
+                <option value="600000">10分</option>
+                <option value="1800000">30分</option>
+                <option value="3600000">1時間</option>
+              </select>
+            </div>
+
+            <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--border-color);">
+
+            <h3>📡 接続方法</h3>
+            <div class="form-group">
+              <label>
+                <input type="radio" name="connectionMethod" value="apiKey" id="useApiKey" checked>
+                APIキーを使用（推奨されません）
+              </label>
+              <label style="margin-left: 16px;">
+                <input type="radio" name="connectionMethod" value="gas" id="useGas">
+                Google Apps Script (GAS) を使用（推奨）
+              </label>
+            </div>
+
+            <div id="gasSettings" style="display: none;">
+              <div class="form-group">
+                <label for="gasUrl">GAS Web App URL</label>
+                <input type="url" id="gasUrl" class="input-field"
+                  placeholder="https://script.google.com/macros/s/.../exec">
+                <small style="color: var(--text-secondary); display: block; margin-top: 4px;">
+                  📖 <a href="docs/gas-setup-guide.md" target="_blank">GASセットアップガイド</a>を参照
+                </small>
+              </div>
+            </div>
+
+            <div class="button-group">
+              <button id="testConnectionBtn" class="btn btn-secondary">接続テスト</button>
+              <button id="saveSettingsBtn" class="btn btn-primary">保存</button>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h3>アプリ情報</h3>
+            <p>バージョン: 1.5.0 (フェーズ1.5)</p>
+            <p>機能: Google Sheets統合強化版</p>
+          </div>
+
+          <button id="closeSettingsBtn" class="btn btn-secondary">閉じる</button>
+        </div>
+      </div>
+
+      <!-- ダッシュボード画面 -->
+      <div id="dashboardView" class="view">
+        <!-- シート切り替えタブ -->
+        <div id="sheetTabs" class="sheet-tabs hidden">
+          <div class="tabs-container" id="tabsContainer">
+            <!-- シートタブが動的に追加されます -->
+          </div>
+        </div>
+
+        <!-- ダッシュボードヘッダー -->
+        <div class="dashboard-header">
+          <h2 id="dashboardTitle">📈 データ一覧</h2>
+          <button id="refreshBtn" class="btn btn-primary">🔄 更新</button>
+        </div>
+
+        <!-- 検索・フィルターバー -->
+        <div class="search-filter-bar">
+          <div class="search-box">
+            <input type="text" id="searchInput" placeholder="🔍 検索..." class="search-input">
+            <button id="clearSearchBtn" class="clear-btn hidden">✕</button>
+          </div>
+          <div class="filter-controls">
+            <button id="filterBtn" class="btn btn-secondary">📋 フィルター</button>
+            <button id="sortBtn" class="btn btn-secondary">⬆️ ソート</button>
+          </div>
+        </div>
+
+        <!-- データ統計 -->
+        <div id="dataStats" class="data-stats hidden">
+          <div class="stat-card">
+            <span class="stat-label">全データ</span>
+            <span class="stat-value" id="statTotal">0</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">今日</span>
+            <span class="stat-value" id="statToday">0</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">今週</span>
+            <span class="stat-value" id="statWeek">0</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">今月</span>
+            <span class="stat-value" id="statMonth">0</span>
+          </div>
+        </div>
+
+        <!-- データカード表示エリア -->
+        <div id="dataContainer" class="data-container">
+          <!-- データがない場合 -->
+          <div id="emptyState" class="empty-state">
+            <div class="empty-icon">📋</div>
+            <h3>データがありません</h3>
+            <p>設定画面でGoogle Sheetsを連携してください</p>
+            <button id="goToSettingsBtn" class="btn btn-primary">設定を開く</button>
+          </div>
+        </div>
+
+        <!-- 最終更新時刻 -->
+        <div id="lastUpdate" class="last-update hidden">
+          最終更新: <span id="lastUpdateTime">-</span>
+        </div>
+      </div>
+
+      <!-- メモ一覧画面 -->
+      <div id="memoView" class="view hidden">
+        <!-- MemoView.jsによって動的にコンテンツが生成されます -->
+      </div>
+
+      <!-- メモ編集画面 -->
+      <div id="memoEditorView" class="view hidden">
+        <!-- MemoEditor.jsによって動的にコンテンツが生成されます -->
+      </div>
+    </main>
+
+    <!-- 詳細表示モーダル -->
+    <div id="detailModal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modalTitle">詳細情報</h3>
+          <button id="closeModalBtn" class="icon-btn">✕</button>
+        </div>
+        <div class="modal-body" id="modalBody">
+          <!-- 詳細データが動的に追加されます -->
+        </div>
+      </div>
+    </div>
+
+    <!-- フィルター・ソートモーダル -->
+    <div id="filterModal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>フィルター・ソート</h3>
+          <button id="closeFilterModalBtn" class="icon-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>ソート項目</label>
+            <select id="sortField" class="input-field">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>ソート順</label>
+            <select id="sortDirection" class="input-field">
+              <option value="asc">昇順</option>
+              <option value="desc">降順</option>
+            </select>
+          </div>
+          <div class="button-group">
+            <button id="resetFilterBtn" class="btn btn-secondary">リセット</button>
+            <button id="applyFilterBtn" class="btn btn-primary">適用</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer class="app-footer">
+      <nav class="bottom-nav">
+        <button class="nav-item active" data-view="dashboard">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-label">ホーム</span>
+        </button>
+        <button class="nav-item" data-view="memo">
+          <span class="nav-icon">📝</span>
+          <span class="nav-label">メモ</span>
+        </button>
+        <button class="nav-item" data-view="timeline">
+          <span class="nav-icon">📅</span>
+          <span class="nav-label">タイムライン</span>
+        </button>
+        <button class="nav-item" data-view="settings">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">設定</span>
+        </button>
+      </nav>
+    </footer>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>
