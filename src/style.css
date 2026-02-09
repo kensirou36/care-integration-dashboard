@@ -1136,6 +1136,12 @@ body {
   color: var(--text-primary);
 }
 
+.shift-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 /* Week Navigation */
 .week-navigation {
   display: flex;
@@ -1416,6 +1422,7 @@ body {
     /* Hide time on very small screens */
   }
 }
+
 /* ============================================
    SHIFT EDITOR STYLES
    ============================================ */

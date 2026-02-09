@@ -17,10 +17,11 @@ import {
 } from '../utils/shiftUtils.js';
 
 export class ShiftView {
-    constructor(containerId, onNewShiftClick, onShiftClick) {
+    constructor(containerId, onNewShiftClick, onShiftClick, onRefresh = null) {
         this.container = document.getElementById(containerId);
         this.onNewShiftClick = onNewShiftClick;
         this.onShiftClick = onShiftClick;
+        this.onRefresh = onRefresh;
         this.currentWeekStart = getWeekStart(new Date());
         this.shifts = [];
     }
@@ -44,9 +45,14 @@ export class ShiftView {
         this.container.innerHTML = `
             <div class="shift-header">
                 <h2>📅 シフト管理</h2>
-                <button id="newShiftBtn" class="btn btn-primary">
-                    <span class="icon">➕</span> <span class="text">新規シフト</span>
-                </button>
+                <div class="shift-header-actions">
+                    <button id="refreshShiftsBtn" class="btn btn-secondary" title="Google Sheetsから最新データを読み込み">
+                        <span class="icon">🔄</span> <span class="text">更新</span>
+                    </button>
+                    <button id="newShiftBtn" class="btn btn-primary">
+                        <span class="icon">➕</span> <span class="text">新規シフト</span>
+                    </button>
+                </div>
             </div>
 
             <div class="week-navigation">
@@ -160,6 +166,13 @@ export class ShiftView {
      * イベントリスナーを設定
      */
     attachEventListeners() {
+        // リフレッシュボタン
+        document.getElementById('refreshShiftsBtn')?.addEventListener('click', async () => {
+            if (this.onRefresh) {
+                await this.onRefresh();
+            }
+        });
+
         // 新規シフトボタン
         document.getElementById('newShiftBtn')?.addEventListener('click', () => {
             this.onNewShiftClick();

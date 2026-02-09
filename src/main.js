@@ -105,12 +105,12 @@ function initMemoFeatures() {
 function initShiftFeatures() {
   // ShiftView 初期化
   shiftView = new ShiftView('timelineView',
-    // 新規シフト作成クリック時
+    // 新規シフト作成
     () => {
       shiftEditor.renderNew();
       showView('shiftEditor');
     },
-    // シフトクリック時 (編集)
+    // シフトクリック
     async (id) => {
       const { getAllShifts } = await import('./api/shiftData.js');
       const shifts = await getAllShifts();
@@ -119,6 +119,13 @@ function initShiftFeatures() {
         shiftEditor.renderEdit(shift);
         showView('shiftEditor');
       }
+    },
+    // リフレッシュ
+    async () => {
+      showLoading(true);
+      await loadShiftData();
+      showLoading(false);
+      showNotification('シフトデータを更新しました', 'success');
     }
   );
 
