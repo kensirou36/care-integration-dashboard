@@ -413,11 +413,62 @@ export class ImageCropper {
             cropCanvas.height
         );
 
-        // Convert to blob
-        cropCanvas.toBlob((blob) => {
+        // Convert to blob with polyfill for mobile browsers
+        try {
+            const blob = await this.canvasToBlob(cropCanvas, this.imageBlob.type || 'image/png');
             this.cleanup();
             this.onComplete(blob);
-        }, this.imageBlob.type || 'image/png');
+        } catch (error) {
+            console.error('画像の保存に失敗しました:', error);
+            alert('画像の保存に失敗しました。もう一度お試しください。');
+            this.cleanup();
+            this.onCancel();
+        }
+    }
+
+    /**
+     * Canvas to Blob with polyfill for mobile browsers
+     * toBlob is not supported in older iOS Safari
+     */
+    canvasToBlob(canvas, type = 'image/png', quality = 0.95) {
+        return new Promise((resolve, reject) => {
+            // Check if native toBlob is available
+            if (canvas.toBlob) {
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        resolve(blob);
+                    } else {
+                        reject(new Error('Failed to create blob'));
+                    }
+                }, type, quality);
+            } else {
+                // Polyfill using toDataURL
+                try {
+                    const dataURL = canvas.toDataURL(type, quality);
+                    const blob = this.dataURLToBlob(dataURL);
+                    resolve(blob);
+                } catch (error) {
+                    reject(error);
+                }
+            }
+        });
+    }
+
+    /**
+     * Convert data URL to Blob
+     */
+    dataURLToBlob(dataURL) {
+        const parts = dataURL.split(',');
+        const mime = parts[0].match(/:(.*?);/)[1];
+        const bstr = atob(parts[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+
+        return new Blob([u8arr], { type: mime });
     }
 
     cleanup() {
