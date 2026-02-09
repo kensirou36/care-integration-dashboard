@@ -363,14 +363,19 @@ function extractShiftFromText(text, baseDate) {
     }
   }
   
+  
   // スタッフ名抽出: "田中さん_家_..." -> "田中"
   const staffMatch = text.match(/^([^\s_]+)(?:さん)?/);
   if (staffMatch) {
     result.スタッフ = staffMatch[1].replace(/さん$/, '');
   }
   
-  // 時間抽出: "18 時から 19 時まで"
-  const timeMatch1 = text.match(/(\d{1,2})\s*時(?:\s*(\d{1,2})\s*分)?から\s*(\d{1,2})\s*時(?:\s*(\d{1,2})\s*分)?/);
+  // 時間抽出: 複数のパターンに対応
+  let timeExtracted = false;
+  
+  // パターン1: "18時から19時まで" または "18 時から 19 時まで"
+  const timePattern1 = /(\d{1,2})\s*時(?:\s*(\d{1,2})\s*分)?(?:から|～)\s*(\d{1,2})\s*時(?:\s*(\d{1,2})\s*分)?/;
+  const timeMatch1 = text.match(timePattern1);
   if (timeMatch1) {
     const startHour = timeMatch1[1].padStart(2, '0');
     const startMin = (timeMatch1[2] || '00').padStart(2, '0');
@@ -378,16 +383,50 @@ function extractShiftFromText(text, baseDate) {
     const endMin = (timeMatch1[4] || '00').padStart(2, '0');
     result.開始 = startHour + ':' + startMin;
     result.終了 = endHour + ':' + endMin;
-  } else {
-    // "12 時 15" のような形式
-    const timeMatch2 = text.match(/(\d{1,2})\s*時\s*(\d{1,2})/);
+    timeExtracted = true;
+  }
+  
+  // パターン2: "18時-19時" または "18:00-19:00"
+  if (!timeExtracted) {
+    const timePattern2 = /(\d{1,2})[:時]\s*(\d{1,2})?\s*[-～]\s*(\d{1,2})[:時]\s*(\d{1,2})?/;
+    const timeMatch2 = text.match(timePattern2);
     if (timeMatch2) {
-      const hour = timeMatch2[1].padStart(2, '0');
-      const min = timeMatch2[2].padStart(2, '0');
+      const startHour = timeMatch2[1].padStart(2, '0');
+      const startMin = (timeMatch2[2] || '00').padStart(2, '0');
+      const endHour = timeMatch2[3].padStart(2, '0');
+      const endMin = (timeMatch2[4] || '00').padStart(2, '0');
+      result.開始 = startHour + ':' + startMin;
+      result.終了 = endHour + ':' + endMin;
+      timeExtracted = true;
+    }
+  }
+  
+  // パターン3: "12時15" のような形式（終了時刻なし）
+  if (!timeExtracted) {
+    const timePattern3 = /(\d{1,2})\s*時\s*(\d{1,2})/;
+    const timeMatch3 = text.match(timePattern3);
+    if (timeMatch3) {
+      const hour = timeMatch3[1].padStart(2, '0');
+      const min = timeMatch3[2].padStart(2, '0');
       result.開始 = hour + ':' + min;
       // 終了時刻は1時間後と仮定
-      const endHour = (parseInt(timeMatch2[1]) + 1).toString().padStart(2, '0');
+      const endHour = (parseInt(timeMatch3[1]) + 1).toString().padStart(2, '0');
       result.終了 = endHour + ':' + min;
+      timeExtracted = true;
+    }
+  }
+  
+  // パターン4: "18時" のみ（分なし）
+  if (!timeExtracted) {
+    const timePattern4 = /(\d{1,2})\s*時/;
+    const timeMatch4 = text.match(timePattern4);
+    if (timeMatch4) {
+      const hour = timeMatch4[1].padStart(2, '0');
+      result.開始 = hour + ':00';
+      // 終了時刻は1時間後と仮定
+      const endHour = (parseInt(timeMatch4[1]) + 1).toString().padStart(2, '0');
+      result.終了 = endHour + ':00';
+      timeExtracted = true;
     }
   }
   
