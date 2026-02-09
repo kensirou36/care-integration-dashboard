@@ -9,6 +9,8 @@ import { saveSettings, loadSettings, cacheData, getCachedData, isConfigured } fr
 import { filterData, sortData, searchData, calculateStats, formatDate } from './utils/dataProcessor.js';
 import { MemoView } from './components/MemoView.js';
 import { MemoEditor } from './components/MemoEditor.js';
+import { ShiftView } from './components/ShiftView.js';
+import { ShiftEditor } from './components/ShiftEditor.js';
 
 // グローバル状態
 let currentView = 'dashboard';
@@ -19,6 +21,8 @@ let filteredData = []; // フィルター・検索後のデータ
 let autoRefreshTimer = null;
 let memoView = null;
 let memoEditor = null;
+let shiftView = null;
+let shiftEditor = null;
 
 /**
  * アプリケーション初期化
@@ -34,6 +38,9 @@ function init() {
 
   // メモ機能初期化
   initMemoFeatures();
+
+  // シフト機能初期化
+  initShiftFeatures();
 
   // 設定を読み込み
   loadSettingsToUI();
@@ -90,6 +97,50 @@ function initMemoFeatures() {
       showView('memo');
     }
   );
+}
+
+/**
+ * シフト機能初期化
+ */
+function initShiftFeatures() {
+  // ShiftView 初期化
+  shiftView = new ShiftView('timelineView',
+    // 新規シフト作成クリック時
+    () => {
+      shiftEditor.renderNew();
+      showView('shiftEditor');
+    },
+    // シフトクリック時 (編集)
+    async (id) => {
+      const { getAllShifts } = await import('./api/shiftData.js');
+      const shifts = await getAllShifts();
+      const shift = shifts.find(s => s.id === id);
+      if (shift) {
+        shiftEditor.renderEdit(shift);
+        showView('shiftEditor');
+      }
+    }
+  );
+
+  // ShiftEditor 初期化
+  shiftEditor = new ShiftEditor('shiftEditorView',
+    // 保存時
+    async (shiftData, isEditMode) => {
+      await handleShiftSave(shiftData, isEditMode);
+    },
+    // キャンセル時
+    () => {
+      showView('timeline');
+    }
+  );
+
+  // 削除コールバックを設定
+  shiftEditor.setOnDelete(async (id) => {
+    await handleShiftDelete(id);
+  });
+
+  // サンプルデータを読み込み
+  loadShiftData();
 }
 
 /**
@@ -202,6 +253,12 @@ function showView(viewName) {
     if (memoView) memoView.render();
   } else if (viewName === 'memoEditor') {
     document.getElementById('memoEditorView')?.classList.remove('hidden');
+  } else if (viewName === 'timeline') {
+    document.getElementById('timelineView')?.classList.remove('hidden');
+    // シフトビューをレンダリング
+    if (shiftView) shiftView.render();
+  } else if (viewName === 'shiftEditor') {
+    document.getElementById('shiftEditorView')?.classList.remove('hidden');
   } else {
     // 未実装のビュー
     showNotification(`${viewName}機能は次のフェーズで実装予定です`, 'info');
@@ -736,6 +793,150 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+/**
+ * シフトデータを読み込み
+ */
+async function loadShiftData() {
+  const settings = loadSettings();
+
+  // GAS設定がある場合はGoogle Sheetsから読み込み
+  if (settings.useGas && settings.gasUrl) {
+    try {
+      const { fetchShiftsViaGAS } = await import('./api/gasApi.js');
+      const { replaceShiftsFromSheets } = await import('./api/shiftData.js');
+
+      // Google Sheetsからシフトデータを取得
+      const shiftsFromSheets = await fetchShiftsViaGAS(settings.gasUrl, 'シフト');
+
+      // IndexedDBに保存
+      await replaceShiftsFromSheets(shiftsFromSheets);
+
+      // ShiftViewに設定
+      if (shiftView) {
+        shiftView.setShifts(shiftsFromSheets);
+      }
+
+      console.log(`✅ ${shiftsFromSheets.length}件のシフトをGoogle Sheetsから読み込みました`);
+      return;
+    } catch (error) {
+      console.error('シフトデータの読み込みエラー:', error);
+
+      // エラーの場合はIndexedDBから読み込みを試みる
+      try {
+        const { getAllShifts } = await import('./api/shiftData.js');
+        const cachedShifts = await getAllShifts();
+
+        if (cachedShifts && cachedShifts.length > 0) {
+          if (shiftView) {
+            shiftView.setShifts(cachedShifts);
+          }
+          console.log(`⚠️ キャッシュから${cachedShifts.length}件のシフトを読み込みました`);
+          return;
+        }
+      } catch (cacheError) {
+        console.error('キャッシュからの読み込みエラー:', cacheError);
+      }
+    }
+  }
+
+  // GAS設定がない場合、またはエラーの場合はサンプルデータを使用
+  const sampleShifts = [
+    { id: 1, 日付: '2026-02-03', スタッフ: '山田太郎', シフト: '早番', 開始: '07:00', 終了: '16:00', 備考: '-' },
+    { id: 2, 日付: '2026-02-03', スタッフ: '鈴木次郎', シフト: '遅番', 開始: '11:00', 終了: '20:00', 備考: '-' },
+    { id: 3, 日付: '2026-02-04', スタッフ: '山田太郎', シフト: '休み', 開始: '-', 終了: '-', 備考: '有給休暇' },
+    { id: 4, 日付: '2026-02-04', スタッフ: '田中花子', シフト: '早番', 開始: '07:00', 終了: '16:00', 備考: '-' },
+    { id: 5, 日付: '2026-02-04', スタッフ: '鈴木次郎', シフト: '遅番', 開始: '11:00', 終了: '20:00', 備考: '-' },
+    { id: 6, 日付: '2026-02-05', スタッフ: '田中花子', シフト: '夜勤', 開始: '16:00', 終了: '09:00', 備考: '-' },
+    { id: 7, 日付: '2026-02-06', スタッフ: '山田太郎', シフト: '早番', 開始: '07:00', 終了: '16:00', 備考: '-' },
+    { id: 8, 日付: '2026-02-06', スタッフ: '佐藤美咲', シフト: '遅番', 開始: '11:00', 終了: '20:00', 備考: '-' },
+  ];
+
+  if (shiftView) {
+    shiftView.setShifts(sampleShifts);
+  }
+
+  console.log('📋 サンプルシフトデータを表示しています');
+}
+
+/**
+ * シフト保存処理
+ */
+async function handleShiftSave(shiftData, isEditMode) {
+  const settings = loadSettings();
+
+  try {
+    if (isEditMode) {
+      // 更新処理
+      const { updateShift } = await import('./api/shiftData.js');
+      await updateShift(shiftData.id, shiftData);
+
+      // Google Sheetsにも反映(GAS設定がある場合)
+      if (settings.useGas && settings.gasUrl) {
+        // TODO: 行番号を特定して更新する必要がある
+        // 現在はIndexedDBのみ更新
+        console.log('⚠️ Google Sheetsへの更新は今後実装予定です');
+      }
+
+      showNotification('シフトを更新しました', 'success');
+    } else {
+      // 新規作成処理
+      const { addShift } = await import('./api/shiftData.js');
+      await addShift(shiftData);
+
+      // Google Sheetsにも追加(GAS設定がある場合)
+      if (settings.useGas && settings.gasUrl) {
+        const { appendMemoViaGAS } = await import('./api/gasApi.js');
+        const row = [
+          shiftData.日付,
+          shiftData.スタッフ,
+          shiftData.シフト,
+          shiftData.開始,
+          shiftData.終了,
+          shiftData.備考
+        ];
+        await appendMemoViaGAS(settings.gasUrl, row, 'シフト');
+      }
+
+      showNotification('シフトを作成しました', 'success');
+    }
+
+    // シフトデータを再読み込み
+    await loadShiftData();
+    showView('timeline');
+  } catch (error) {
+    console.error('シフト保存エラー:', error);
+    showNotification('シフトの保存に失敗しました: ' + error.message, 'error');
+  }
+}
+
+/**
+ * シフト削除処理
+ */
+async function handleShiftDelete(id) {
+  const settings = loadSettings();
+
+  try {
+    const { deleteShift } = await import('./api/shiftData.js');
+    await deleteShift(id);
+
+    // Google Sheetsからも削除(GAS設定がある場合)
+    if (settings.useGas && settings.gasUrl) {
+      // TODO: 行番号を特定して削除する必要がある
+      // 現在はIndexedDBのみ削除
+      console.log('⚠️ Google Sheetsからの削除は今後実装予定です');
+    }
+
+    showNotification('シフトを削除しました', 'success');
+
+    // シフトデータを再読み込み
+    await loadShiftData();
+    showView('timeline');
+  } catch (error) {
+    console.error('シフト削除エラー:', error);
+    showNotification('シフトの削除に失敗しました: ' + error.message, 'error');
+  }
 }
 
 // アニメーション追加

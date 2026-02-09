@@ -5,6 +5,7 @@
 
 import Tesseract from 'tesseract.js';
 import { saveMemo, updateMemo, getMemo } from '../api/memoData.js';
+import { ImageCropper } from './ImageCropper.js';
 
 export class MemoEditor {
     constructor(containerId, onSave, onCancel) {
@@ -13,6 +14,7 @@ export class MemoEditor {
         this.onCancel = onCancel; // Callback for cancel
         this.currentBlob = null;
         this.currentMemoId = null;
+        this.cropper = null;      // ImageCropper instance
     }
 
     /**
@@ -133,18 +135,8 @@ export class MemoEditor {
         const file = event.target.files[0];
         if (!file) return;
 
-        this.currentBlob = file;
-        const imageUrl = URL.createObjectURL(file);
-
-        // Replace placeholder with image
-        const imageSection = document.querySelector('.image-section');
-        imageSection.innerHTML = `<img src="${imageUrl}" id="previewImage" class="preview-image">`;
-
-        // Show OCR controls
-        document.getElementById('ocrControls').classList.remove('hidden');
-
-        // Enable save button
-        document.getElementById('saveMemoBtn').disabled = false;
+        // Show crop mode instead of directly showing the image
+        this.showCropMode(file);
     }
 
     async runOCR() {
@@ -209,5 +201,44 @@ export class MemoEditor {
             btn.disabled = false;
             btn.textContent = '保存';
         }
+    }
+
+    /**
+     * Show crop mode for the selected image
+     * @param {Blob} imageBlob - The image to crop
+     */
+    showCropMode(imageBlob) {
+        // Hide the editor UI temporarily
+        this.container.innerHTML = '<div id="cropperContainer"></div>';
+
+        // Create and render the cropper
+        this.cropper = new ImageCropper(
+            'cropperContainer',
+            imageBlob,
+            (croppedBlob) => this.handleCropComplete(croppedBlob),
+            () => this.handleCropCancel()
+        );
+
+        this.cropper.render();
+    }
+
+    /**
+     * Handle crop completion
+     * @param {Blob} croppedBlob - The cropped image blob
+     */
+    handleCropComplete(croppedBlob) {
+        this.currentBlob = croppedBlob;
+        const imageUrl = URL.createObjectURL(croppedBlob);
+
+        // Re-render the editor UI with the cropped image
+        this.renderUI('', imageUrl);
+    }
+
+    /**
+     * Handle crop cancellation
+     */
+    handleCropCancel() {
+        // Return to the editor UI without an image
+        this.renderUI();
     }
 }

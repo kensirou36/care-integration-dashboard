@@ -17,6 +17,30 @@ function doGet(e) {
       return getSheetData(sheetName);
     } else if (action === 'getAllData') {
       return getAllSheetsData();
+    } else if (action === 'appendMemo') {
+      // GETでメモ追加（CORS回避用）
+      const sheetName = e.parameter.sheetName || 'メモ';
+      const rowData = e.parameter.data; // JSON文字列
+      const row = JSON.parse(decodeURIComponent(rowData));
+      return appendMemoToSheet({ sheetName: sheetName, row: row });
+    } else if (action === 'appendMemos') {
+      // GETで複数メモ追加（CORS回避用）
+      const sheetName = e.parameter.sheetName || 'メモ';
+      const rowsData = e.parameter.data; // JSON文字列
+      const rows = JSON.parse(decodeURIComponent(rowsData));
+      return appendMemosToSheet({ sheetName: sheetName, rows: rows });
+    } else if (action === 'updateShift') {
+      // シフト更新
+      const sheetName = e.parameter.sheetName || 'シフト';
+      const rowNumber = parseInt(e.parameter.rowNumber);
+      const rowData = e.parameter.data;
+      const row = JSON.parse(decodeURIComponent(rowData));
+      return updateShiftRow({ sheetName: sheetName, rowNumber: rowNumber, row: row });
+    } else if (action === 'deleteShift') {
+      // シフト削除
+      const sheetName = e.parameter.sheetName || 'シフト';
+      const rowNumber = parseInt(e.parameter.rowNumber);
+      return deleteShiftRow({ sheetName: sheetName, rowNumber: rowNumber });
     }
     
     return createResponse({ error: 'Invalid action' }, 400);
@@ -43,6 +67,13 @@ function doPost(e) {
   } catch (error) {
     return createResponse({ error: error.toString() }, 500);
   }
+}
+
+/**
+ * OPTIONSリクエストの処理（CORSプリフライト）
+ */
+function doOptions(e) {
+  return createResponse({}, 200);
 }
 
 /**
@@ -157,12 +188,67 @@ function appendMemosToSheet(data) {
 }
 
 /**
- * レスポンスを作成
+ * レスポンスを作成（CORSヘッダー付き）
  */
 function createResponse(data, statusCode = 200) {
   const output = ContentService.createTextOutput(JSON.stringify(data));
   output.setMimeType(ContentService.MimeType.JSON);
   
-  // CORSヘッダーを追加
+  // CORSヘッダーを追加（重要: localhostと本番環境の両方で動作するように）
+  // Note: Apps ScriptのContentServiceではHTTPヘッダーを直接設定できないため、
+  // デプロイ時の設定で「アクセスできるユーザー: 全員」にすることでCORSが許可されます
+  
   return output;
+}
+
+/**
+ * シフトの行を更新
+ */
+function updateShiftRow(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetName = data.sheetName || 'シフト';
+  
+  let sheet = ss.getSheetByName(sheetName);
+  
+  if (!sheet) {
+    return createResponse({ error: 'Sheet not found: ' + sheetName }, 404);
+  }
+  
+  const rowNumber = data.rowNumber; // 1始まり
+  const row = data.row; // [日付, スタッフ, シフト, 開始, 終了, 備考]
+  
+  // 行を更新
+  const range = sheet.getRange(rowNumber, 1, 1, row.length);
+  range.setValues([row]);
+  
+  return createResponse({
+    success: true,
+    sheetName: sheetName,
+    rowNumber: rowNumber
+  });
+}
+
+/**
+ * シフトの行を削除
+ */
+function deleteShiftRow(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetName = data.sheetName || 'シフト';
+  
+  let sheet = ss.getSheetByName(sheetName);
+  
+  if (!sheet) {
+    return createResponse({ error: 'Sheet not found: ' + sheetName }, 404);
+  }
+  
+  const rowNumber = data.rowNumber; // 1始まり
+  
+  // 行を削除
+  sheet.deleteRow(rowNumber);
+  
+  return createResponse({
+    success: true,
+    sheetName: sheetName,
+    rowNumber: rowNumber
+  });
 }

@@ -81,17 +81,11 @@ export async function fetchAllSheetsViaGAS(gasUrl) {
  * @returns {Promise<Object>} - 追加結果
  */
 export async function appendMemoViaGAS(gasUrl, row, sheetName = 'メモ') {
-    const response = await fetch(gasUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            action: 'appendMemo',
-            sheetName: sheetName,
-            row: row
-        })
-    });
+    // GETリクエストを使用（CORS回避）
+    const encodedData = encodeURIComponent(JSON.stringify(row));
+    const url = `${gasUrl}?action=appendMemo&sheetName=${encodeURIComponent(sheetName)}&data=${encodedData}`;
+
+    const response = await fetch(url);
 
     if (!response.ok) {
         throw new Error(`GAS接続エラー (${response.status}): ${response.statusText}`);
@@ -113,17 +107,11 @@ export async function appendMemoViaGAS(gasUrl, row, sheetName = 'メモ') {
  * @returns {Promise<Object>} - 追加結果
  */
 export async function appendMemosViaGAS(gasUrl, rows, sheetName = 'メモ') {
-    const response = await fetch(gasUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            action: 'appendMemos',
-            sheetName: sheetName,
-            rows: rows
-        })
-    });
+    // GETリクエストを使用（CORS回避）
+    const encodedData = encodeURIComponent(JSON.stringify(rows));
+    const url = `${gasUrl}?action=appendMemos&sheetName=${encodeURIComponent(sheetName)}&data=${encodedData}`;
+
+    const response = await fetch(url);
 
     if (!response.ok) {
         throw new Error(`GAS接続エラー (${response.status}): ${response.statusText}`);
@@ -155,4 +143,78 @@ function convertToObjects(data) {
         });
         return obj;
     });
+}
+
+/**
+ * GAS経由でシフトデータを取得
+ * @param {string} gasUrl - GAS Web App URL
+ * @param {string} sheetName - シート名(デフォルト: 'シフト')
+ * @returns {Promise<Array<Object>>} - シフトデータの配列
+ */
+export async function fetchShiftsViaGAS(gasUrl, sheetName = 'シフト') {
+    const url = `${gasUrl}?action=getData&sheetName=${encodeURIComponent(sheetName)}`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+        throw new Error(`GAS接続エラー (${response.status}): ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    if (result.error) {
+        throw new Error(`GASエラー: ${result.error}`);
+    }
+
+    // 2次元配列をオブジェクト配列に変換
+    return convertToObjects(result.data);
+}
+
+/**
+ * GAS経由でシフトを更新
+ * @param {string} gasUrl - GAS Web App URL
+ * @param {number} rowNumber - 行番号(1始まり、ヘッダー含む)
+ * @param {Array} rowData - 更新する行データ
+ * @param {string} sheetName - シート名(デフォルト: 'シフト')
+ * @returns {Promise<Object>} - 更新結果
+ */
+export async function updateShiftViaGAS(gasUrl, rowNumber, rowData, sheetName = 'シフト') {
+    const encodedData = encodeURIComponent(JSON.stringify(rowData));
+    const url = `${gasUrl}?action=updateShift&sheetName=${encodeURIComponent(sheetName)}&rowNumber=${rowNumber}&data=${encodedData}`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+        throw new Error(`GAS接続エラー (${response.status}): ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    if (data.error) {
+        throw new Error(`GASエラー: ${data.error}`);
+    }
+
+    return data;
+}
+
+/**
+ * GAS経由でシフトを削除
+ * @param {string} gasUrl - GAS Web App URL
+ * @param {number} rowNumber - 行番号(1始まり、ヘッダー含む)
+ * @param {string} sheetName - シート名(デフォルト: 'シフト')
+ * @returns {Promise<Object>} - 削除結果
+ */
+export async function deleteShiftViaGAS(gasUrl, rowNumber, sheetName = 'シフト') {
+    const url = `${gasUrl}?action=deleteShift&sheetName=${encodeURIComponent(sheetName)}&rowNumber=${rowNumber}`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+        throw new Error(`GAS接続エラー (${response.status}): ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    if (data.error) {
+        throw new Error(`GASエラー: ${data.error}`);
+    }
+
+    return data;
 }
