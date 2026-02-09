@@ -145,7 +145,7 @@ function initShiftFeatures() {
       try {
         console.log('📝 シフト抽出開始...');
         const { extractShiftsViaGAS } = await import('./api/gasApi.js');
-        const result = await extractShiftsViaGAS(settings.gasUrl);
+        const result = await extractShiftsViaGAS(settings.gasUrl, 'メモ');  // 'メモ'シートから抽出
 
         console.log('✅ 抽出結果:', result);
         showNotification(`${result.count}件のシフトを抽出しました`, 'success');
