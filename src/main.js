@@ -143,15 +143,19 @@ function initShiftFeatures() {
       showLoading(true);
 
       try {
+        console.log('📝 シフト抽出開始...');
         const { extractShiftsViaGAS } = await import('./api/gasApi.js');
         const result = await extractShiftsViaGAS(settings.gasUrl);
 
+        console.log('✅ 抽出結果:', result);
         showNotification(`${result.count}件のシフトを抽出しました`, 'success');
 
         // データを再読み込み
+        console.log('🔄 シフトデータを再読み込み中...');
         await loadShiftData();
+        console.log('✅ シフトデータの再読み込み完了');
       } catch (error) {
-        console.error('シフト抽出エラー:', error);
+        console.error('❌ シフト抽出エラー:', error);
         alert('シフト抽出に失敗しました: ' + error.message);
       } finally {
         showLoading(false);
