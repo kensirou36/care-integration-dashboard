@@ -364,16 +364,28 @@ function extractShiftFromText(text, baseDate) {
   }
   
   
-  // スタッフ名抽出: "田中さん_家_..." -> "田中"
-  const staffMatch = text.match(/^([^\s_]+)(?:さん)?/);
+  // スタッフ名抽出: テキストの先頭から抽出
+  // 例: "後藤　2月10日..." -> "後藤"
+  // 例: "田中さん_家_..." -> "田中"
+  const staffPattern = /^([^\s　_\d]+)(?:さん)?/;  // 全角・半角スペース、アンダースコア、数字の前まで
+  const staffMatch = text.match(staffPattern);
   if (staffMatch) {
     result.スタッフ = staffMatch[1].replace(/さん$/, '');
+  }
+  
+  // 介護先/場所を抽出して備考に追加
+  // 例: "田中さん家" "佐藤さん宅" など
+  const locationPattern = /([^\s　]+(?:さん|様)(?:家|宅|方))/;
+  const locationMatch = text.match(locationPattern);
+  if (locationMatch) {
+    result.備考 = locationMatch[1] + ' - ' + text;
+  }
   }
   
   // 時間抽出: 複数のパターンに対応
   let timeExtracted = false;
   
-  // パターン1: "18時から19時まで" または "18 時から 19 時まで"
+  // パターン1: "12時から15時" "12時から15時まで" "12 時から 15 時" (全角・半角スペース対応)
   const timePattern1 = /(\d{1,2})\s*時(?:\s*(\d{1,2})\s*分)?(?:から|～)\s*(\d{1,2})\s*時(?:\s*(\d{1,2})\s*分)?/;
   const timeMatch1 = text.match(timePattern1);
   if (timeMatch1) {
