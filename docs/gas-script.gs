@@ -380,7 +380,6 @@ function extractShiftFromText(text, baseDate) {
   if (locationMatch) {
     result.備考 = locationMatch[1] + ' - ' + text;
   }
-  }
   
   // 時間抽出: 複数のパターンに対応
   let timeExtracted = false;
