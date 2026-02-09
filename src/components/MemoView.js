@@ -217,26 +217,56 @@ export class MemoView {
         return;
       }
 
+      // プログレス表示用
+      const totalCount = unexportedMemos.length;
+      let processedCount = 0;
+
       if (settings.useGas) {
-        // GAS経由でエクスポート
-        const { appendMemosViaGAS } = await import('../api/gasApi.js');
+        // GAS経由でエクスポート（チャンク処理でURL長制限を回避）
+        const { appendMemoViaGAS } = await import('../api/gasApi.js');
         const { formatMemoForExport } = await import('../api/sheetsWrite.js');
-        const rows = unexportedMemos.map(memo => formatMemoForExport(memo));
-        await appendMemosViaGAS(settings.gasUrl, rows);
+
+        // モバイルブラウザのURL長制限を考慮して1件ずつ送信
+        for (const memo of unexportedMemos) {
+          try {
+            const row = formatMemoForExport(memo);
+            await appendMemoViaGAS(settings.gasUrl, row);
+            await markAsExported(memo.id);
+            processedCount++;
+
+            // プログレス表示（5件ごと）
+            if (processedCount % 5 === 0 || processedCount === totalCount) {
+              console.log(`📤 転記中: ${processedCount}/${totalCount}`);
+            }
+          } catch (error) {
+            console.error(`メモID ${memo.id} の転記に失敗:`, error);
+            // 個別のエラーは続行
+          }
+        }
       } else {
         // APIキー経由でエクスポート
         await exportMemosToSheets(settings.apiKey, settings.spreadsheetId, unexportedMemos);
+
+        // Mark all as exported
+        for (const memo of unexportedMemos) {
+          await markAsExported(memo.id);
+        }
+        processedCount = totalCount;
       }
 
-      // Mark all as exported
-      for (const memo of unexportedMemos) {
-        await markAsExported(memo.id);
+      if (processedCount > 0) {
+        alert(`✅ ${processedCount}件のメモをSheetsに転記しました！`);
+        this.refreshList();
+      } else {
+        alert('❌ メモの転記に失敗しました。設定を確認してください。');
       }
-
-      alert(`✅ ${unexportedMemos.length}件のメモをSheetsに転記しました！`);
-      this.refreshList();
     } catch (error) {
       console.error('Bulk export error:', error);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       alert('❌ 一括エクスポートに失敗しました: ' + error.message);
     }
   }
