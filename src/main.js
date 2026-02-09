@@ -833,14 +833,26 @@ function escapeHtml(text) {
 async function loadShiftData() {
   const settings = loadSettings();
 
+  console.log('📊 シフトデータ読み込み開始', {
+    useGas: settings.useGas,
+    gasUrl: settings.gasUrl
+  });
+
   // GAS設定がある場合はGoogle Sheetsから読み込み
   if (settings.useGas && settings.gasUrl) {
     try {
       const { fetchShiftsViaGAS } = await import('./api/gasApi.js');
       const { replaceShiftsFromSheets } = await import('./api/shiftData.js');
 
+      console.log('🔍 Google Sheetsからシフトデータを取得中...');
+
       // Google Sheetsからシフトデータを取得
       const shiftsFromSheets = await fetchShiftsViaGAS(settings.gasUrl, 'シフト');
+
+      console.log('📥 取得したシフトデータ:', {
+        count: shiftsFromSheets.length,
+        sample: shiftsFromSheets.slice(0, 3)
+      });
 
       // IndexedDBに保存
       await replaceShiftsFromSheets(shiftsFromSheets);
@@ -848,12 +860,20 @@ async function loadShiftData() {
       // ShiftViewに設定
       if (shiftView) {
         shiftView.setShifts(shiftsFromSheets);
+        console.log('✅ ShiftViewを更新しました');
+      } else {
+        console.warn('⚠️ shiftViewが初期化されていません');
       }
 
       console.log(`✅ ${shiftsFromSheets.length}件のシフトをGoogle Sheetsから読み込みました`);
       return;
     } catch (error) {
-      console.error('シフトデータの読み込みエラー:', error);
+      console.error('❌ シフトデータの読み込みエラー:', error);
+      console.error('エラー詳細:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
 
       // エラーの場合はIndexedDBから読み込みを試みる
       try {
