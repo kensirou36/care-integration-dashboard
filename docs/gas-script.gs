@@ -317,12 +317,26 @@ function extractAndSaveShifts(params) {
   
   // 新しいデータを追加
   extractedShifts.forEach(shift => {
+    // 日付を文字列形式に正規化
+    let dateStr = shift.日付;
+    if (shift.日付 instanceof Date) {
+      dateStr = Utilities.formatDate(shift.日付, 'JST', 'yyyy-MM-dd');
+    } else if (typeof shift.日付 === 'string') {
+      dateStr = shift.日付;
+    }
+    
+    // 時刻のスペースを除去 ("1 2 : 0 0" -> "12:00")
+    const cleanTime = (timeStr) => {
+      if (!timeStr || timeStr === '-') return '-';
+      return timeStr.toString().replace(/\s+/g, '');
+    };
+    
     shiftSheet.appendRow([
-      shift.日付,
+      dateStr,
       shift.スタッフ,
       shift.シフト,
-      shift.開始,
-      shift.終了,
+      cleanTime(shift.開始),
+      cleanTime(shift.終了),
       shift.備考
     ]);
   });
