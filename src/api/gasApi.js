@@ -146,6 +146,29 @@ function convertToObjects(data) {
 }
 
 /**
+ * GAS経由でテキストからシフトデータを抽出
+ * @param {string} gasUrl - GAS Web App URL
+ * @param {string} sourceSheet - ソースシート名（デフォルト: 'シフト'）
+ * @returns {Promise<Object>} - 抽出結果
+ */
+export async function extractShiftsViaGAS(gasUrl, sourceSheet = 'シフト') {
+    const url = `${gasUrl}?action=extractShifts&sourceSheet=${encodeURIComponent(sourceSheet)}`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+        throw new Error(`GAS接続エラー (${response.status}): ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    if (data.error) {
+        throw new Error(`GASエラー: ${data.error}`);
+    }
+
+    return data;
+}
+
+/**
  * GAS経由でシフトデータを取得
  * @param {string} gasUrl - GAS Web App URL
  * @param {string} sheetName - シート名(デフォルト: 'シフト')

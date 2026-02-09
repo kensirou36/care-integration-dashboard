@@ -126,6 +126,36 @@ function initShiftFeatures() {
       await loadShiftData();
       showLoading(false);
       showNotification('シフトデータを更新しました', 'success');
+    },
+    // テキスト抽出
+    async () => {
+      const settings = loadSettings();
+
+      if (!settings.useGas || !settings.gasUrl) {
+        alert('GAS設定が必要です。設定画面でGAS Web App URLを設定してください。');
+        return;
+      }
+
+      if (!confirm('テキスト内容からシフトデータを抽出しますか?\n\n既存のシフトデータは上書きされます。')) {
+        return;
+      }
+
+      showLoading(true);
+
+      try {
+        const { extractShiftsViaGAS } = await import('./api/gasApi.js');
+        const result = await extractShiftsViaGAS(settings.gasUrl);
+
+        showNotification(`${result.count}件のシフトを抽出しました`, 'success');
+
+        // データを再読み込み
+        await loadShiftData();
+      } catch (error) {
+        console.error('シフト抽出エラー:', error);
+        alert('シフト抽出に失敗しました: ' + error.message);
+      } finally {
+        showLoading(false);
+      }
     }
   );
 

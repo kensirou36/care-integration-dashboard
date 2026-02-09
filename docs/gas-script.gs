@@ -41,6 +41,10 @@ function doGet(e) {
       const sheetName = e.parameter.sheetName || 'シフト';
       const rowNumber = parseInt(e.parameter.rowNumber);
       return deleteShiftRow({ sheetName: sheetName, rowNumber: rowNumber });
+    } else if (action === 'extractShifts') {
+      // テキストからシフトデータを抽出
+      const sourceSheet = e.parameter.sourceSheet || 'シフト';
+      return extractAndSaveShifts({ sourceSheet: sourceSheet });
     }
     
     return createResponse({ error: 'Invalid action' }, 400);
@@ -251,4 +255,150 @@ function deleteShiftRow(data) {
     sheetName: sheetName,
     rowNumber: rowNumber
   });
+}
+
+/**
+ * テキストからシフトデータを抽出して保存
+ */
+function extractAndSaveShifts(params) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sourceSheetName = params.sourceSheet || 'シフト';
+  const sourceSheet = ss.getSheetByName(sourceSheetName);
+  
+  if (!sourceSheet) {
+    return createResponse({ error: 'Source sheet not found: ' + sourceSheetName }, 404);
+  }
+  
+  // B列(テキスト内容)とA列(作成日時)を取得
+  const lastRow = sourceSheet.getLastRow();
+  if (lastRow < 2) {
+    return createResponse({ error: 'No data to extract' }, 400);
+  }
+  
+  const data = sourceSheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  
+  const extractedShifts = [];
+  let currentDate = null;
+  
+  data.forEach(row => {
+    const [createdDate, textContent] = row;
+    if (!textContent) return;
+    
+    const text = textContent.toString().trim();
+    
+    // 日付行を検出 (例: "2/4(火)")
+    const dateMatch = text.match(/^(\d{1,2})\/(\d{1,2})/);
+    if (dateMatch) {
+      const month = parseInt(dateMatch[1]);
+      const day = parseInt(dateMatch[2]);
+      const year = createdDate ? new Date(createdDate).getFullYear() : new Date().getFullYear();
+      currentDate = Utilities.formatDate(new Date(year, month - 1, day), 'JST', 'yyyy-MM-dd');
+      return;
+    }
+    
+    // シフト情報を抽出
+    const shift = extractShiftFromText(text, currentDate || createdDate);
+    if (shift.日付 && shift.スタッフ) {
+      extractedShifts.push(shift);
+    }
+  });
+  
+  // 「シフト」シートに書き込み
+  let shiftSheet = ss.getSheetByName('シフト');
+  if (!shiftSheet) {
+    shiftSheet = ss.insertSheet('シフト');
+    shiftSheet.appendRow(['日付', 'スタッフ', 'シフト', '開始', '終了', '備考']);
+  }
+  
+  // 既存データをクリア(ヘッダー以外)
+  if (shiftSheet.getLastRow() > 1) {
+    shiftSheet.getRange(2, 1, shiftSheet.getLastRow() - 1, 6).clearContent();
+  }
+  
+  // 新しいデータを追加
+  extractedShifts.forEach(shift => {
+    shiftSheet.appendRow([
+      shift.日付,
+      shift.スタッフ,
+      shift.シフト,
+      shift.開始,
+      shift.終了,
+      shift.備考
+    ]);
+  });
+  
+  return createResponse({
+    success: true,
+    count: extractedShifts.length,
+    message: extractedShifts.length + '件のシフトを抽出しました'
+  });
+}
+
+/**
+ * テキストからシフト情報を抽出
+ */
+function extractShiftFromText(text, baseDate) {
+  const result = {
+    日付: null,
+    スタッフ: null,
+    シフト: 'ヘルパー',
+    開始: '-',
+    終了: '-',
+    備考: text
+  };
+  
+  // 日付抽出: "2 月 10 日"
+  const dateMatch = text.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+  if (dateMatch) {
+    const month = parseInt(dateMatch[1]);
+    const day = parseInt(dateMatch[2]);
+    const year = baseDate ? new Date(baseDate).getFullYear() : new Date().getFullYear();
+    result.日付 = Utilities.formatDate(new Date(year, month - 1, day), 'JST', 'yyyy-MM-dd');
+  } else if (baseDate) {
+    // 日付が見つからない場合はbaseDateを使用
+    if (typeof baseDate === 'string') {
+      result.日付 = baseDate;
+    } else {
+      result.日付 = Utilities.formatDate(new Date(baseDate), 'JST', 'yyyy-MM-dd');
+    }
+  }
+  
+  // スタッフ名抽出: "田中さん_家_..." -> "田中"
+  const staffMatch = text.match(/^([^\s_]+)(?:さん)?/);
+  if (staffMatch) {
+    result.スタッフ = staffMatch[1].replace(/さん$/, '');
+  }
+  
+  // 時間抽出: "18 時から 19 時まで"
+  const timeMatch1 = text.match(/(\d{1,2})\s*時(?:\s*(\d{1,2})\s*分)?から\s*(\d{1,2})\s*時(?:\s*(\d{1,2})\s*分)?/);
+  if (timeMatch1) {
+    const startHour = timeMatch1[1].padStart(2, '0');
+    const startMin = (timeMatch1[2] || '00').padStart(2, '0');
+    const endHour = timeMatch1[3].padStart(2, '0');
+    const endMin = (timeMatch1[4] || '00').padStart(2, '0');
+    result.開始 = startHour + ':' + startMin;
+    result.終了 = endHour + ':' + endMin;
+  } else {
+    // "12 時 15" のような形式
+    const timeMatch2 = text.match(/(\d{1,2})\s*時\s*(\d{1,2})/);
+    if (timeMatch2) {
+      const hour = timeMatch2[1].padStart(2, '0');
+      const min = timeMatch2[2].padStart(2, '0');
+      result.開始 = hour + ':' + min;
+      // 終了時刻は1時間後と仮定
+      const endHour = (parseInt(timeMatch2[1]) + 1).toString().padStart(2, '0');
+      result.終了 = endHour + ':' + min;
+    }
+  }
+  
+  // シフト種別抽出
+  if (text.includes('ヘルパー')) {
+    result.シフト = 'ヘルパー';
+  } else if (text.includes('訪問')) {
+    result.シフト = '訪問';
+  } else if (text.includes('デイ')) {
+    result.シフト = 'デイ';
+  }
+  
+  return result;
 }
