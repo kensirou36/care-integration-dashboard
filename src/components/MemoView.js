@@ -172,6 +172,13 @@ export class MemoView {
         const { appendMemoViaGAS } = await import('../api/gasApi.js');
         const { formatMemoForExport } = await import('../api/sheetsWrite.js');
         const row = formatMemoForExport(memo);
+
+        console.log('📤 メモ転送開始:', {
+          memoId: id,
+          gasUrl: settings.gasUrl,
+          rowLength: row.length
+        });
+
         await appendMemoViaGAS(settings.gasUrl, row);
       } else {
         // APIキー経由でエクスポート
@@ -184,7 +191,35 @@ export class MemoView {
       this.refreshList();
     } catch (error) {
       console.error('Export error:', error);
-      alert('❌ エクスポートに失敗しました: ' + error.message);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+
+      // より詳細なエラーメッセージ
+      let errorMessage = '❌ エクスポートに失敗しました\n\n';
+
+      if (error.message.includes('GAS接続エラー')) {
+        errorMessage += '原因: GAS Web App に接続できません\n';
+        errorMessage += '対処法:\n';
+        errorMessage += '1. GAS URL が正しいか確認\n';
+        errorMessage += '2. インターネット接続を確認\n';
+        errorMessage += '3. GAS デプロイが有効か確認';
+      } else if (error.message.includes('Sheet not found')) {
+        errorMessage += '原因: Google Sheets に「メモ」シートが見つかりません\n';
+        errorMessage += '対処法: Google Sheets に「メモ」という名前のシートを作成してください';
+      } else if (error.message.includes('Failed to fetch')) {
+        errorMessage += '原因: ネットワークエラー\n';
+        errorMessage += '対処法:\n';
+        errorMessage += '1. インターネット接続を確認\n';
+        errorMessage += '2. Wi-Fi/モバイルデータを切り替えて再試行';
+      } else {
+        errorMessage += '詳細: ' + error.message + '\n\n';
+        errorMessage += 'ブラウザのコンソールで詳細を確認してください';
+      }
+
+      alert(errorMessage);
     }
   }
 

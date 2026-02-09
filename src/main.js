@@ -163,6 +163,7 @@ function setupEventListeners() {
   // 設定画面のボタン
   document.getElementById('saveSettingsBtn')?.addEventListener('click', handleSaveSettings);
   document.getElementById('testConnectionBtn')?.addEventListener('click', handleTestConnection);
+  document.getElementById('testGasBtn')?.addEventListener('click', handleTestGasConnection);
   document.getElementById('closeSettingsBtn')?.addEventListener('click', () => {
     showView('dashboard');
   });
@@ -363,6 +364,30 @@ async function handleTestConnection() {
   } catch (error) {
     console.error('接続テストエラー:', error);
     showNotification(`❌ 接続失敗: ${error.message}`, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+/**
+ * GAS接続テスト
+ */
+async function handleTestGasConnection() {
+  const gasUrl = document.getElementById('gasUrl').value.trim();
+
+  if (!gasUrl) {
+    showNotification('GAS Web App URLを入力してください', 'error');
+    return;
+  }
+
+  showLoading(true);
+
+  try {
+    const { runGASConnectionTest } = await import('./utils/gasTest.js');
+    await runGASConnectionTest(gasUrl);
+  } catch (error) {
+    console.error('GAS接続テストエラー:', error);
+    alert(`❌ GAS接続テストに失敗しました\n\n詳細: ${error.message}`);
   } finally {
     showLoading(false);
   }
