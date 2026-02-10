@@ -139,7 +139,18 @@ function convertToObjects(data) {
     return rows.map(row => {
         const obj = {};
         headers.forEach((header, index) => {
-            obj[header] = row[index];
+            let value = row[index];
+
+            // 時間列の処理: Google Sheetsのシリアル値を HH:MM 形式に変換
+            if ((header === '開始' || header === '終了') && typeof value === 'number') {
+                // Google Sheetsの時間シリアル値(0-1の小数)を時:分に変換
+                const totalMinutes = Math.round(value * 24 * 60);
+                const hours = Math.floor(totalMinutes / 60);
+                const minutes = totalMinutes % 60;
+                value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+            }
+
+            obj[header] = value;
         });
         return obj;
     });
