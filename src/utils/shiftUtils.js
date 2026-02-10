@@ -141,7 +141,13 @@ export function getUniqueStaff(shifts) {
 export function getShiftsByDate(shifts, date) {
     const dateStr = formatDateYMD(date);
     return shifts.filter(shift => {
-        const shiftDate = shift.日付 || shift.date;
+        let shiftDate = shift.日付 || shift.date;
+
+        // ISO形式の日付文字列の場合、YYYY-MM-DD部分を抽出
+        if (shiftDate && typeof shiftDate === 'string' && shiftDate.includes('T')) {
+            shiftDate = shiftDate.split('T')[0];
+        }
+
         return shiftDate === dateStr;
     });
 }
