@@ -33,6 +33,10 @@ export class ShiftView {
      */
     setShifts(shifts) {
         this.shifts = shifts || [];
+        console.log('📊 ShiftView.setShifts:', {
+            count: this.shifts.length,
+            sample: this.shifts.slice(0, 2)
+        });
         this.render();
     }
 
@@ -117,6 +121,13 @@ export class ShiftView {
     renderDayCell(date) {
         const dayShifts = getShiftsByDate(this.shifts, date);
         const dateStr = formatDateYMD(date);
+
+        console.log('📅 renderDayCell:', {
+            date: dateStr,
+            shiftsFound: dayShifts.length,
+            totalShifts: this.shifts.length,
+            shifts: dayShifts
+        });
 
         return `
             <div class="calendar-day-cell ${isToday(date) ? 'today' : ''}" data-date="${dateStr}">
