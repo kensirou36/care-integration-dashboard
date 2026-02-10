@@ -70,12 +70,26 @@ export function formatDateMD(date) {
 
 /**
  * 時刻を HH:MM 形式にフォーマット
- * @param {string} time - 時刻文字列 (例: "07:00", "7:00")
+ * @param {string} time - 時刻文字列 (例: "07:00", "7:00") または ISO形式の日付文字列
  * @returns {string} - フォーマットされた時刻文字列
  */
 export function formatTime(time) {
     if (!time || time === '-') return '-';
-    const parts = time.split(':');
+
+    // ISO形式の日付文字列の場合、時刻部分を抽出
+    if (typeof time === 'string' && time.includes('T')) {
+        try {
+            const date = new Date(time);
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${hours}:${minutes}`;
+        } catch (e) {
+            console.warn('時刻の変換に失敗:', time, e);
+            return '-';
+        }
+    }
+
+    const parts = String(time).split(':');
     if (parts.length !== 2) return time;
     const hour = String(parts[0]).padStart(2, '0');
     const minute = String(parts[1]).padStart(2, '0');

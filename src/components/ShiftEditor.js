@@ -266,8 +266,22 @@ export class ShiftEditor {
      */
     formatTimeForInput(time) {
         if (!time || time === '-') return '';
+
+        // ISO形式の日付文字列の場合、時刻部分を抽出
+        if (typeof time === 'string' && time.includes('T')) {
+            try {
+                const date = new Date(time);
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `${hours}:${minutes}`;
+            } catch (e) {
+                console.warn('時刻の変換に失敗:', time, e);
+                return '';
+            }
+        }
+
         // HH:MM形式に変換
-        const parts = time.split(':');
+        const parts = String(time).split(':');
         if (parts.length === 2) {
             return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
         }
