@@ -735,14 +735,25 @@ async function showDetailModal(item) {
   const modalBody = document.getElementById('modalBody');
   const modalTitle = document.getElementById('modalTitle');
 
-  // formatTime関数をインポート
-  const { formatTime } = await import('./utils/shiftUtils.js');
+  // formatTime関数とformatDateYMD関数をインポート
+  const { formatTime, formatDateYMD } = await import('./utils/shiftUtils.js');
 
   const keys = Object.keys(item);
-  modalTitle.textContent = item[keys[0]] || '詳細情報';
+
+  // タイトルを設定（日付フィールドの場合はフォーマット）
+  let titleValue = item[keys[0]] || '詳細情報';
+  if (keys[0] === '日付' && titleValue && typeof titleValue === 'string' && titleValue.includes('T')) {
+    titleValue = formatDateYMD(new Date(titleValue));
+  }
+  modalTitle.textContent = titleValue;
 
   modalBody.innerHTML = keys.map(key => {
     let value = item[key];
+
+    // 日付フィールドをフォーマット
+    if (key === '日付' && value && typeof value === 'string' && value.includes('T')) {
+      value = formatDateYMD(new Date(value));
+    }
 
     // 時間フィールドをフォーマット
     if (key === '開始' || key === '終了') {
