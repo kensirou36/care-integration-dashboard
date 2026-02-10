@@ -730,20 +730,32 @@ function createDataCard(item, index) {
 /**
  * 詳細モーダルを表示
  */
-function showDetailModal(item) {
+async function showDetailModal(item) {
   const modal = document.getElementById('detailModal');
   const modalBody = document.getElementById('modalBody');
   const modalTitle = document.getElementById('modalTitle');
 
+  // formatTime関数をインポート
+  const { formatTime } = await import('./utils/shiftUtils.js');
+
   const keys = Object.keys(item);
   modalTitle.textContent = item[keys[0]] || '詳細情報';
 
-  modalBody.innerHTML = keys.map(key => `
-    <div class="detail-row">
-      <div class="detail-label">${escapeHtml(key)}</div>
-      <div class="detail-value">${escapeHtml(item[key])}</div>
-    </div>
-  `).join('');
+  modalBody.innerHTML = keys.map(key => {
+    let value = item[key];
+
+    // 時間フィールドをフォーマット
+    if (key === '開始' || key === '終了') {
+      value = formatTime(value);
+    }
+
+    return `
+      <div class="detail-row">
+        <div class="detail-label">${escapeHtml(key)}</div>
+        <div class="detail-value">${escapeHtml(value)}</div>
+      </div>
+    `;
+  }).join('');
 
   modal.classList.remove('hidden');
 }
