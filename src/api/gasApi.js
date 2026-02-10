@@ -141,6 +141,21 @@ function convertToObjects(data) {
         headers.forEach((header, index) => {
             let value = row[index];
 
+            // 日付列の処理: Google Sheetsのシリアル値またはISO文字列をYYYY-MM-DD形式に変換
+            if (header === '日付') {
+                if (typeof value === 'number') {
+                    // シリアル値の場合: 1900年1月1日からの日数
+                    const date = new Date((value - 25569) * 86400 * 1000);
+                    const year = date.getUTCFullYear();
+                    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                    const day = String(date.getUTCDate()).padStart(2, '0');
+                    value = `${year}-${month}-${day}`;
+                } else if (typeof value === 'string' && value.includes('T')) {
+                    // ISO形式の文字列の場合: YYYY-MM-DD部分を抽出
+                    value = value.split('T')[0];
+                }
+            }
+
             // 時間列の処理: Google Sheetsのシリアル値を HH:MM 形式に変換
             if ((header === '開始' || header === '終了') && typeof value === 'number') {
                 // Google Sheetsの時間シリアル値(0-1の小数)を時:分に変換
