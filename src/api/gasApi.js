@@ -145,10 +145,11 @@ function convertToObjects(data) {
             if (header === '日付') {
                 if (typeof value === 'number') {
                     // シリアル値の場合: 1900年1月1日からの日数
+                    // タイムゾーンオフセットを考慮してローカル時刻として変換
                     const date = new Date((value - 25569) * 86400 * 1000);
-                    const year = date.getUTCFullYear();
-                    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-                    const day = String(date.getUTCDate()).padStart(2, '0');
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
                     value = `${year}-${month}-${day}`;
                 } else if (typeof value === 'string' && value.includes('T')) {
                     // ISO形式の文字列の場合: YYYY-MM-DD部分を抽出
