@@ -141,25 +141,34 @@ function convertToObjects(data) {
         headers.forEach((header, index) => {
             let value = row[index];
 
-            // 日付列の処理: Google Sheetsのシリアル値またはISO文字列をYYYY-MM-DD形式に変換
-            if (header === '日付') {
-                if (typeof value === 'number') {
-                    // シリアル値の場合: 1900年1月1日からの日数
-                    // タイムゾーンオフセットを考慮してローカル時刻として変換
-                    const date = new Date((value - 25569) * 86400 * 1000);
-                    const year = date.getFullYear();
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    const day = String(date.getDate()).padStart(2, '0');
-                    value = `${year}-${month}-${day}`;
-                } else if (typeof value === 'string' && value.includes('T')) {
-                    // ISO形式の文字列の場合: YYYY-MM-DD部分を抽出
-                    value = value.split('T')[0];
-                }
+            // フォールバック: GASで変換されなかった場合の処理
+
+            // 日付列: ISO形式の文字列の場合、日付部分を抽出
+            if (header === '日付' && typeof value === 'string' && value.includes('T')) {
+                value = value.split('T')[0];
+            }
+            // 日付列: シリアル値の場合（フォールバック）
+            else if (header === '日付' && typeof value === 'number' && value > 1000) {
+                const date = new Date((value - 25569) * 86400 * 1000);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                value = `${year}-${month}-${day}`;
             }
 
-            // 時間列の処理: Google Sheetsのシリアル値を HH:MM 形式に変換
-            if ((header === '開始' || header === '終了') && typeof value === 'number') {
-                // Google Sheetsの時間シリアル値(0-1の小数)を時:分に変換
+            // 時間列: ISO形式の日付文字列の場合、時刻部分を抽出
+            if ((header === '開始' || header === '終了') && typeof value === 'string' && value.includes('T')) {
+                try {
+                    const date = new Date(value);
+                    const hours = String(date.getHours()).padStart(2, '0');
+                    const minutes = String(date.getMinutes()).padStart(2, '0');
+                    value = `${hours}:${minutes}`;
+                } catch (e) {
+                    console.warn('時刻の変換に失敗:', value, e);
+                }
+            }
+            // 時間列: シリアル値の場合（フォールバック）
+            else if ((header === '開始' || header === '終了') && typeof value === 'number' && value < 1) {
                 const totalMinutes = Math.round(value * 24 * 60);
                 const hours = Math.floor(totalMinutes / 60);
                 const minutes = totalMinutes % 60;

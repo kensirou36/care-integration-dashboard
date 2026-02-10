@@ -108,12 +108,58 @@ function getSheetData(sheetName) {
     return createResponse({ error: 'Sheet not found: ' + sheetName }, 404);
   }
   
-  const data = sheet.getDataRange().getValues();
+  const rawData = sheet.getDataRange().getValues();
+  
+  // データを変換（日付と時刻を文字列形式に）
+  const data = convertSheetData(rawData, sheetName);
   
   return createResponse({
     sheetName: sheetName,
     data: data
   });
+}
+
+/**
+ * シートデータを変換（日付・時刻を文字列形式に）
+ */
+function convertSheetData(data, sheetName) {
+  if (!data || data.length === 0) return data;
+  
+  const headers = data[0];
+  const convertedData = [headers]; // ヘッダー行はそのまま
+  
+  // データ行を変換
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const convertedRow = [];
+    
+    for (let j = 0; j < row.length; j++) {
+      let value = row[j];
+      const header = headers[j];
+      
+      // 日付列の変換
+      if (header === '日付' && value instanceof Date) {
+        value = Utilities.formatDate(value, 'JST', 'yyyy-MM-dd');
+      }
+      // 時刻列の変換
+      else if ((header === '開始' || header === '終了') && value instanceof Date) {
+        value = Utilities.formatDate(value, 'JST', 'HH:mm');
+      }
+      // 数値の時刻（シリアル値）の変換
+      else if ((header === '開始' || header === '終了') && typeof value === 'number' && value < 1) {
+        const totalMinutes = Math.round(value * 24 * 60);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        value = Utilities.formatString('%02d:%02d', hours, minutes);
+      }
+      
+      convertedRow.push(value);
+    }
+    
+    convertedData.push(convertedRow);
+  }
+  
+  return convertedData;
 }
 
 /**
